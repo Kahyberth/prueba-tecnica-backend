@@ -1,26 +1,37 @@
+import { format } from '@fast-csv/format';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
   BadRequestException,
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Estado } from '@prisma/client';
 import { Cache } from 'cache-manager';
-import * as csv from 'fast-csv';
+import { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PrismaService } from 'src/prisma-service/prisma-service.service';
+import { PrismaService } from '../prisma-service/prisma-service.service';
 import { departmentsAndCities } from './data/departmentsAndCities';
 import { CreateMerchantDto } from './dto/create-merchant.dto';
 import { PaginatedResponse, PaginationDto } from './dto/pagination.dto';
 import { UpdateMerchantDto } from './dto/update-merchant.dto';
 import { invalidateMerchantsCache } from './utils/merchant.cache';
-import { validateMunicipio } from './utils/merchant.validators';
+import { findMerchantWithEstablishments } from './utils/merchant.data';
+import {
+  MerchantTotals,
+  calculateMerchantTotals,
+} from './utils/merchant.totals';
+import {
+  validateMerchantId,
+  validateMunicipio,
+} from './utils/merchant.validators';
 
 @Injectable()
 export class MerchantsService {
+  private readonly logger = new Logger(MerchantsService.name);
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
@@ -192,6 +203,46 @@ export class MerchantsService {
 
       throw new BadRequestException(
         'Error al crear el comerciante. Verifique los datos proporcionados.',
+      );
+    }
+  }
+
+  async getTotalsByMerchant(merchantId: number): Promise<MerchantTotals> {
+    validateMerchantId(merchantId);
+
+    const cacheKey = `merchant-totals:${merchantId}`;
+
+    try {
+      const cachedTotals =
+        await this.cacheManager.get<MerchantTotals>(cacheKey);
+      if (cachedTotals) {
+        return cachedTotals;
+      }
+
+      const merchant = await findMerchantWithEstablishments(
+        this.prisma,
+        merchantId,
+      );
+      const totals = calculateMerchantTotals(merchant.establecimientos);
+
+      await this.cacheManager.set(cacheKey, totals, 300);
+
+      return totals;
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      await this.cacheManager.del(cacheKey);
+      this.logger.error(
+        `Error calculating totals for merchant ${merchantId}:`,
+        error,
+      );
+      throw new BadRequestException(
+        'Error al calcular los totales del comerciante',
       );
     }
   }
@@ -424,23 +475,7 @@ export class MerchantsService {
     }
   }
 
-  async generateCSV(): Promise<{
-    message: string;
-    data: {
-      pipeFile: {
-        filePath: string;
-        fileName: string;
-        delimiter: string;
-      };
-      excelFile: {
-        filePath: string;
-        fileName: string;
-        delimiter: string;
-      };
-      totalRecords: number;
-      generatedAt: string;
-    };
-  }> {
+  async generarCSV(res: Response) {
     const merchants = await this.prisma.comerciante.findMany({
       where: {
         estado: Estado.ACTIVO,
@@ -450,79 +485,62 @@ export class MerchantsService {
       },
     });
 
-    const records = merchants.map((merchant) => {
-      const cantidadEstablecimientos = merchant.establecimientos.length;
-      const totalIngresos = merchant.establecimientos.reduce(
-        (acc, e) => acc + e.ingresos,
-        0,
-      );
-      const cantidadEmpleados = merchant.establecimientos.reduce(
-        (acc, e) => acc + e.numeroEmpleados,
-        0,
-      );
+    const reportsDir = path.resolve(__dirname, '../../reports');
+    if (!fs.existsSync(reportsDir)) {
+      fs.mkdirSync(reportsDir, { recursive: true });
+      this.logger.log(`Carpeta creada en: ${reportsDir}`);
+    }
 
-      return {
-        'Nombre o razón social': merchant.nombreRazonSocial,
-        Municipio: merchant.municipio,
-        Teléfono: merchant.telefono || '',
-        'Correo Electrónico': merchant.correoElectronico || '',
-        'Fecha de Registro': merchant.fechaRegistro.toISOString().split('T')[0],
-        Estado: merchant.estado,
-        'Cantidad de Establecimientos': cantidadEstablecimientos,
-        'Total Ingresos': totalIngresos,
-        'Cantidad de Empleados': cantidadEmpleados,
-      };
+    const fileName = `reporte_comerciantes_${Date.now()}.csv`;
+    const filePath = path.join(reportsDir, fileName);
+
+    const writeStream = fs.createWriteStream(filePath, { encoding: 'utf8' });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+    const sepLine = 'sep=|\n';
+    writeStream.write(sepLine);
+    res.write(sepLine);
+
+    const csvStream = format({ headers: false, delimiter: '|' });
+
+    csvStream.pipe(writeStream);
+    csvStream.pipe(res);
+
+    csvStream.write([
+      'Nombre o Razón Social',
+      'Municipio',
+      'Teléfono',
+      'Correo Electrónico',
+      'Fecha de Registro',
+      'Estado',
+      'Cantidad de Establecimientos',
+      'Total Ingresos',
+      'Cantidad de Empleados',
+    ]);
+
+    for (const fila of merchants) {
+      csvStream.write([
+        fila.nombreRazonSocial,
+        fila.municipio,
+        fila.telefono,
+        fila.correoElectronico,
+        fila.fechaRegistro,
+        fila.estado,
+        fila.establecimientos.length.toString(),
+        fila.establecimientos
+          .reduce((acc, e) => acc + e.ingresos, 0)
+          .toString(),
+        fila.establecimientos
+          .reduce((acc, e) => acc + e.numeroEmpleados, 0)
+          .toString(),
+      ]);
+    }
+    csvStream.end();
+    csvStream.on('end', () => {
+      writeStream.end();
+      this.logger.log(`CSV guardado en disco en: ${filePath}`);
     });
-
-    const exportDir = path.join(process.cwd(), 'src', 'exports');
-
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[:.]/g, '-')
-      .slice(0, 19);
-    const fileNamePipe = `merchants_${timestamp}_pipe.txt`;
-    const fileNameComma = `merchants_${timestamp}_excel.csv`;
-    const filePathPipe = path.join(exportDir, fileNamePipe);
-    const filePathComma = path.join(exportDir, fileNameComma);
-
-    if (!fs.existsSync(exportDir)) {
-      fs.mkdirSync(exportDir, { recursive: true });
-    }
-
-    try {
-      csv.writeToPath(filePathPipe, records, {
-        headers: true,
-        delimiter: '|',
-        writeBOM: true,
-        quoteColumns: true,
-        quoteHeaders: true,
-      });
-
-      await csv.writeToPath(filePathComma, records, {
-        headers: true,
-        delimiter: ';',
-        writeBOM: true,
-      });
-
-      return {
-        message: 'Archivos CSV generados exitosamente',
-        data: {
-          pipeFile: {
-            filePath: filePathPipe,
-            fileName: fileNamePipe,
-            delimiter: '|',
-          },
-          excelFile: {
-            filePath: filePathComma,
-            fileName: fileNameComma,
-            delimiter: ';',
-          },
-          totalRecords: records.length,
-          generatedAt: new Date().toISOString(),
-        },
-      };
-    } catch (error) {
-      throw new BadRequestException('Error al generar los archivos CSV.');
-    }
   }
 }

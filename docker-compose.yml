@@ -8,9 +8,24 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: prueba_db
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  prueba-tecnica:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ARG_DATABASE_URL: 'postgresql://postgres:postgres@postgres:5432/prueba_db?schema=public'
+    ports:
+      - '8080:8080'
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: 'postgresql://postgres:postgres@postgres:5432/prueba_db?schema=public'
+      JWT_SECRET: 'your-secret-key-here'
+      FRONTEND_URL: 'http://localhost:3000'
 
 volumes:
   postgres_data:

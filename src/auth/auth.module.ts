@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 
-import { PrismaService } from 'src/prisma-service/prisma-service.service';
+import { PrismaService } from '../prisma-service/prisma-service.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { GetJwtService } from './jwt/get-jwt.service';

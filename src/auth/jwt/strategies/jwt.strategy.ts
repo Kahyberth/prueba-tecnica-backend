@@ -8,7 +8,7 @@ import { Usuario } from '@prisma/client';
 import { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
-import { PrismaService } from 'src/prisma-service/prisma-service.service';
+import { PrismaService } from '../../../prisma-service/prisma-service.service';
 import { JwtPayload } from '../../interfaces/jwt.payload.interface';
 
 @Injectable()

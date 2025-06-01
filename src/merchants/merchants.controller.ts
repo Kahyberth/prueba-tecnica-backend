@@ -8,10 +8,12 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
-import { Auth } from 'src/auth/decorators/auth.decorator';
-import { GetUserInfo } from 'src/auth/decorators/get-user-info.decorator';
-import { ValidRoles } from 'src/auth/interfaces/valid-roles';
+import { Response } from 'express';
+import { Auth } from '../auth/decorators/auth.decorator';
+import { GetUserInfo } from '../auth/decorators/get-user-info.decorator';
+import { ValidRoles } from '../auth/interfaces/valid-roles';
 import { CreateMerchantDto } from './dto/create-merchant.dto';
 import { PaginationDto } from './dto/pagination.dto';
 import { UpdateMerchantStatusDto } from './dto/update-merchant-status.dto';
@@ -36,14 +38,20 @@ export class MerchantsController {
 
   @Get('export')
   @Auth(ValidRoles.Administrador)
-  exportMerchants() {
-    return this.merchantsService.generateCSV();
+  exportMerchants(@Res() res: Response) {
+    return this.merchantsService.generarCSV(res);
   }
 
   @Get(':id')
   @Auth()
   getMerchantById(@Param('id', ParseIntPipe) id: number) {
     return this.merchantsService.getMerchantById(id);
+  }
+
+  @Get(':id/totals')
+  @Auth()
+  getMerchantTotals(@Param('id', ParseIntPipe) id: number) {
+    return this.merchantsService.getTotalsByMerchant(id);
   }
 
   @Post()
