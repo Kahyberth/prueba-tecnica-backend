@@ -1,7 +1,8 @@
-import { Body, Controller, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { Auth } from './decorators/auth.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -31,4 +32,13 @@ export class AuthController {
     res.clearCookie('token');
     return { message: 'Logout exitoso' };
   }
+
+
+  @Get('verify-session')
+  @Auth()
+  async verifySession() {
+
+    return { message: 'Session verificada' };
+  }
+
 }
