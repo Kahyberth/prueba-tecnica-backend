@@ -11,6 +11,10 @@
 
 ---
 
+## 🔗 Postman
+
+https://www.postman.com/cloudy-escape-667722/workspace/prueba-tecnica
+
 ## 🛠️ Requisitos previos
 
 Asegúrate de tener instalados los siguientes elementos antes de continuar:
