@@ -37,9 +37,21 @@ export class MerchantsService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Obtiene los departamentos y ciudades disponibles
+   * @returns {Promise<any>}
+   */
   async getDepartmentsAndCities() {
     return departmentsAndCities;
   }
+
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Obtiene todos los comerciantes con paginación
+   * @param {PaginationDto} paginationDto - DTO de paginación
+   * @returns {Promise<PaginatedResponse<any>>}
+   */
 
   async getMerchants(
     paginationDto?: PaginationDto,
@@ -105,6 +117,12 @@ export class MerchantsService {
     }
   }
 
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Obtiene un comerciante por su ID
+   * @param {number} id - ID del comerciante
+   * @returns {Promise<any>}
+   */
   async getMerchantById(id: number) {
     const cacheKey = `merchant:${id}`;
 
@@ -138,6 +156,13 @@ export class MerchantsService {
     }
   }
 
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Crea un nuevo comerciante
+   * @param {CreateMerchantDto} createMerchantDto - DTO de creación de comerciante
+   * @param {number} userId - ID del usuario que crea el comerciante
+   * @returns {Promise<any>}
+   */
   async createMerchant(createMerchantDto: CreateMerchantDto, userId: number) {
     const {
       nombreRazonSocial,
@@ -207,6 +232,12 @@ export class MerchantsService {
     }
   }
 
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Obtiene los totales de un comerciante
+   * @param {number} merchantId - ID del comerciante
+   * @returns {Promise<MerchantTotals>}
+   */
   async getTotalsByMerchant(merchantId: number): Promise<MerchantTotals> {
     validateMerchantId(merchantId);
 
@@ -247,11 +278,19 @@ export class MerchantsService {
     }
   }
 
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Actualiza un comerciante
+   * @param {number} id - ID del comerciante
+   * @param {UpdateMerchantDto} updateMerchantDto - DTO de actualización de comerciante
+   * @param {number} userId - ID del usuario que actualiza el comerciante
+   * @returns {Promise<any>}
+   */
   async updateMerchant(
     id: number,
     updateMerchantDto: UpdateMerchantDto,
     userId: number,
-  ) {
+  ): Promise<any> {
     if (!updateMerchantDto || Object.keys(updateMerchantDto).length === 0) {
       throw new BadRequestException(
         'Debe proporcionar al menos un campo para actualizar',
@@ -360,7 +399,19 @@ export class MerchantsService {
     }
   }
 
-  async updateMerchantStatus(id: number, estado: Estado, userId: number) {
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Actualiza el estado de un comerciante
+   * @param {number} id - ID del comerciante
+   * @param {Estado} estado - Estado del comerciante
+   * @param {number} userId - ID del usuario que actualiza el estado del comerciante
+   * @returns {Promise<{ message: string; data: any }>}
+   */
+  async updateMerchantStatus(
+    id: number,
+    estado: Estado,
+    userId: number,
+  ): Promise<{ message: string; data: any }> {
     if (!Object.values(Estado).includes(estado)) {
       throw new BadRequestException(
         `Estado inválido. Los valores permitidos son: ${Object.values(Estado).join(', ')}`,
@@ -422,7 +473,13 @@ export class MerchantsService {
     }
   }
 
-  async deleteMerchant(id: number) {
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Elimina un comerciante
+   * @param {number} id - ID del comerciante
+   * @returns {Promise<{ message: string; data: any }>}
+   */
+  async deleteMerchant(id: number): Promise<{ message: string; data: any }> {
     try {
       const existingMerchant = await this.prisma.comerciante.findUnique({
         where: { id },
@@ -475,6 +532,11 @@ export class MerchantsService {
     }
   }
 
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Genera un CSV de los comerciantes activos
+   * @param {Response} res - Respuesta HTTP
+   */
   async generarCSV(res: Response) {
     const merchants = await this.prisma.comerciante.findMany({
       where: {

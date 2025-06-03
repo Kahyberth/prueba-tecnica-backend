@@ -10,6 +10,13 @@ export class AuthService {
     private prisma: PrismaService,
     private getJwtService: GetJwtService,
   ) {}
+
+  /**
+   * @author Kahyberth Gonzalez
+   * @description Inicia sesión de un usuario
+   * @param {LoginDto} loginDto - DTO de inicio de sesión
+   * @returns {Promise<{ user: any; token: string }>}
+   */
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 

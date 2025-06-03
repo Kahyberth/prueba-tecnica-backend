@@ -51,7 +51,7 @@ bun install
 .env.template  ---> .env
 ```
 
-4. Levanta el contenedor de docker con la imagen de postgresql
+4. Levanta el contenedor de docker con la imagen de postgresql y crear el contenedor del backend
 
 ```
 docker compose up -d
@@ -66,4 +66,12 @@ o
 
 bun start:dev
 
+```
+
+6. Para correr todas las pruebas usa los siguientes comandos
+
+```
+bun test
+o
+npm run test
 ```
